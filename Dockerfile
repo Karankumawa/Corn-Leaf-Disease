@@ -1,20 +1,26 @@
 FROM python:3.11-slim
 
+# Create the Hugging Face user
+RUN useradd -m -u 1000 user
+USER user
+ENV PATH="/home/user/.local/bin:$PATH"
 WORKDIR /app
 
-# Install system dependencies needed for Pillow and OpenCV (if needed)
+# Install system dependencies (for OpenCV/PIL)
+USER root
 RUN apt-get update && apt-get install -y libgl1-mesa-glx libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+USER user
 
-# Install python dependencies
-COPY requirements.txt .
+# Install Python requirements
+COPY --chown=user requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all files
-COPY . .
+# Copy project files
+COPY --chown=user . .
 
-# Expose port (7860 is the default for HuggingFace Spaces, 10000 for Render)
+# Hugging Face uses port 7860
 ENV PORT=7860
 EXPOSE 7860
 
-# Run the app using Gunicorn for production standard
-CMD ["gunicorn", "-b", "0.0.0.0:7860", "server:app"]
+# Start Flask with Gunicorn
+CMD ["gunicorn", "-b", "0.0.0.0:7860", "app:app"]
