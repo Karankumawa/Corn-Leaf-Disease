@@ -6,9 +6,12 @@ MODELS_DIR = BASE_DIR / "models"
 MODEL_PATH = MODELS_DIR / "plant_disease_model.keras"
 LABELS_PATH = MODELS_DIR / "labels.txt"
 
-# Make sure to set this in your terminal/hosting environment!
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "") 
+from dotenv import load_dotenv
 
+load_dotenv() # Loads environment variables from a .env file if it exists
+
+# Make sure to set this in your .env file!
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "") 
 DEFAULT_LABELS = ['Blight', 'Common_Rust', 'Gray_Leaf_Spot', 'Healthy']
 
 TREATMENT_PLANS = {

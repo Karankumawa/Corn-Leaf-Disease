@@ -5,3 +5,4 @@ tensorflow
 scikit-learn
 google-generativeai
 fpdf
+python-dotenv

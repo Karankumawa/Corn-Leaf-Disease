@@ -2,59 +2,96 @@ from fpdf import FPDF
 import tempfile
 import datetime
 
+def safe_txt(text):
+    if not text: return "N/A"
+    return str(text).encode('latin-1', 'replace').decode('latin-1')
+
 def create_pdf_report(predicted_class, confidence, plan, image):
     pdf = FPDF()
     pdf.add_page()
     
-    pdf.set_font("Arial", 'B', 20)
-    pdf.set_text_color(16, 185, 129)
-    pdf.cell(200, 10, txt="Corn Doctor Pro - Diagnostic Report", ln=True, align='C')
-    pdf.ln(5)
+    # 1. Title Banner
+    pdf.set_fill_color(34, 197, 94) # Nice green
+    pdf.rect(0, 0, 210, 25, 'F')
     
-    pdf.set_font("Arial", 'I', 10)
-    pdf.set_text_color(100, 100, 100)
-    pdf.cell(200, 5, txt=f"Date: {datetime.datetime.now().strftime('%B %d, %Y')}", ln=True, align='R')
-    pdf.ln(5)
+    pdf.set_y(8)
+    pdf.set_font("Arial", 'B', 22)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(0, 10, txt="Corn Doctor Pro - Diagnostics", ln=True, align='C')
     
-    pdf.set_font("Arial", 'B', 14)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(200, 10, txt=f"Diagnosis: {plan.get('name', predicted_class)}", ln=True)
-    pdf.set_font("Arial", '', 12)
-    pdf.cell(200, 8, txt=f"Pathogen: {plan.get('scientific_name', 'N/A')}", ln=True)
-    pdf.cell(200, 8, txt=f"AI Confidence: {confidence:.2f}%", ln=True)
-    pdf.ln(5)
+    # 2. Date and Subheader
+    pdf.set_y(35)
+    pdf.set_font("Arial", 'B', 16)
+    pdf.set_text_color(31, 41, 55) # Dark gray slate
+    disease_name = plan.get('name', predicted_class)
+    pdf.cell(120, 8, txt=safe_txt(f"Diagnosis: {disease_name}"), ln=False)
+    
+    pdf.set_font("Arial", 'I', 11)
+    pdf.set_text_color(107, 114, 128) # Lighter gray
+    pdf.cell(70, 8, txt=f"Date: {datetime.datetime.now().strftime('%b %d, %Y')}", ln=True, align='R')
+    
+    # 3. Quick Stats (Pathogen & Confidence) & Image
+    current_y = pdf.get_y()
+    
+    pdf.set_font("Arial", 'B', 11)
+    pdf.set_text_color(75, 85, 99)
+    pdf.cell(120, 6, txt=safe_txt(f"Pathogen: {plan.get('scientific_name', 'N/A')}"), ln=True)
+    pdf.cell(120, 6, txt=f"AI Confidence: {confidence:.1f}%", ln=True)
     
     if image:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
             if image.mode in ('RGBA', 'P'): image = image.convert('RGB')
+            # maintain aspect ratio, resize thumbnail to look great
             image.thumbnail((300, 300))
             image.save(tmp.name)
-            pdf.image(tmp.name, x=10, w=70)
-            pdf.ln(5)
+            # place image on the right
+            pdf.image(tmp.name, x=135, y=current_y, w=60)
             
-    current_y = max(pdf.get_y(), 80)
-    pdf.set_y(current_y + 5)
-    
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(200, 10, txt="Symptoms:", ln=True)
-    pdf.set_font("Arial", '', 11)
-    pdf.multi_cell(0, 6, txt=plan.get('symptoms', 'N/A'))
+    # Draw a subtle separator line
+    highest_y = max(pdf.get_y(), current_y + 40)
+    pdf.set_y(highest_y + 5)
+    pdf.set_draw_color(229, 231, 235)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(5)
 
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(200, 10, txt="Recommended Treatment:", ln=True)
-    pdf.set_font("Arial", '', 11)
-    pdf.multi_cell(0, 6, txt=f"Prevention:\n{plan.get('prevention', 'N/A')}\n\nOrganic:\n{plan.get('organic', 'N/A')}\n\nChemical:\n{plan.get('chemical', 'N/A')}")
+    def add_section(title, content, color):
+        if not content or content == "N/A": return
+        pdf.set_font("Arial", 'B', 13)
+        pdf.set_text_color(*color)
+        pdf.cell(0, 8, txt=title, ln=True)
+        
+        pdf.set_font("Arial", '', 11)
+        pdf.set_text_color(55, 65, 81)
+        
+        # Clean up any potential markdown bullet points from the AI to look neat
+        lines = []
+        for line in safe_txt(content).split('\n'):
+            line = line.strip()
+            if line:
+                if line.startswith('* ') or line.startswith('- '):
+                    lines.append(chr(149) + " " + line[2:])
+                else:
+                    lines.append(line)
+        
+        pdf.multi_cell(0, 6, txt="\n".join(lines))
+        pdf.ln(4)
+
+    # 4. Content Sections with color coding
+    add_section("Key Symptoms:", plan.get('symptoms', 'N/A'), (220, 38, 38)) # Reddish
+    add_section("Preventative Practices:", plan.get('prevention', 'N/A'), (37, 99, 235)) # Blue
+    add_section("Organic Controls:", plan.get('organic', 'N/A'), (22, 163, 74)) # Green
+    add_section("Chemical Controls:", plan.get('chemical', 'N/A'), (217, 119, 6)) # Orange
     
-    pdf.set_y(-50) 
-    pdf.set_font("Times", 'I', 16)
-    pdf.cell(190, 8, txt="karan kumawat", ln=True, align='R')
-    pdf.line(140, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(2)
+    # 5. Footer
+    pdf.set_y(-30)
+    pdf.set_draw_color(229, 231, 235)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(3)
+    
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(190, 5, txt="Founder & Chairman", ln=True, align='R')
-    pdf.set_font("Arial", '', 10)
-    pdf.set_text_color(100, 100, 100)
-    pdf.cell(190, 5, txt="Corn Doctor AI Diagnostics", ln=True, align='R')
+    pdf.set_text_color(107, 114, 128)
+    pdf.cell(0, 5, txt="Karan Kumawat - Founder & Chairman", ln=True, align='C')
+    pdf.set_font("Arial", 'I', 9)
+    pdf.cell(0, 5, txt="Generated by Corn Doctor AI Diagnostics", ln=True, align='C')
 
     return pdf.output(dest='S').encode('latin-1')

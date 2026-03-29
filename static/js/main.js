@@ -153,6 +153,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function formatTextToHtml(text) {
         if(!text) return "";
+        if(Array.isArray(text)) text = text.join('\\n');
+        text = String(text); // Ensure it's a string
         // Simple Markdown-style replacement (e.g. bolding)
         let html = text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
         // Handle line breaks
